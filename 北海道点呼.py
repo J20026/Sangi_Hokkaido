@@ -58,7 +58,7 @@ if submitted:
     else:
         st.error('入力されていない項目があります(memoを除く)')
 st.button('更新')
-status=pd.read_sql("select * from tsuchi.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from tsuchi.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名", con=conn)
+status=pd.read_sql("select distinct on(氏名)* from (select * from tsuchi.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from tsuchi.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a", con=conn)
 status=status.style.applymap(check_situation,subset=['状態'])
 st.table(status)
 
