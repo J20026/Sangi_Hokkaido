@@ -4,8 +4,8 @@ import pandas as pd
 import datetime
 from PIL import Image
 
-im=Image.open("./ito.png")
-st.set_page_config(page_icon=im)
+#im=Image.open("./ito.png")
+#st.set_page_config(page_icon=im)
 
 #更新時間で色付ける？
 #登録したらformをクリア
