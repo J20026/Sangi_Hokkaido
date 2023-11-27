@@ -21,11 +21,11 @@ def check_situation(val):
     return 'background-color: '+b+'; color:'+c
 
 conn = psycopg2.connect(
-        user=st.secrets.DBConnection.user,
-        password=st.secrets.DBConnection.password,
-        host=st.secrets.DBConnection.host,
-        port=st.secrets.DBConnection.port,
-        dbname=st.secrets.DBConnection.dbname
+    user="agr",
+    password="agr",
+    host="133.125.39.70",
+    port="5432",
+    dbname="TEN"
 )
 if "member" not in st.session_state:
     st.session_state.member = pd.read_sql("select * from tsuchi.member order by 氏名", con=conn)
@@ -49,16 +49,16 @@ with st.form("form"):
 if submitted:
     if all(i!='' for i in st.session_state.companion) and name!='' and situation!='':
         cur=conn.cursor()
-        cur.execute("insert into tsuchi.status values('%s','%s','%s','%s')" % (name,situation,memo,datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')))
+        cur.execute("insert into tsuchi.status values('%s','%s','%s')" % (name,situation,memo))
         for i in range(len(st.session_state.companion)):
-            cur.execute("insert into tsuchi.status values('%s','%s','%s','%s')" % (st.session_state.companion[i],situation,memo,datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')))
+            cur.execute("insert into tsuchi.status values('%s','%s','%s')" % (st.session_state.companion[i],situation,memo))
         conn.commit()
         cur.close()
         st.success('登録しました')
     else:
         st.error('入力されていない項目があります(memoを除く)')
 st.button('更新')
-status=pd.read_sql("select distinct on(氏名)* from (select * from tsuchi.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from tsuchi.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a", con=conn)
+status=pd.read_sql("select distinct on(氏名) 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') from(select * from tsuchi.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from tsuchi.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a", con=conn)
 status=status.style.applymap(check_situation,subset=['状態'])
 st.table(status)
 
