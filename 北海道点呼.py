@@ -22,10 +22,10 @@ def check_situation(val):
 
 conn = psycopg2.connect(
     user=st.secrets.DBConnection.user,
-    password=secrets.DBConnection.password,
-    host=secrets.DBConnection.host,
-    port=secrets.DBConnection.port,
-    dbname=secrets.DBConnection.dbname
+    password=st.secrets.DBConnection.password,
+    host=st.secrets.DBConnection.host,
+    port=st.secrets.DBConnection.port,
+    dbname=st.secrets.DBConnection.dbname
 )
 if "member" not in st.session_state:
     st.session_state.member = pd.read_sql("select * from tsuchi.member order by 氏名", con=conn)
