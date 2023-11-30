@@ -3,9 +3,18 @@ import psycopg2
 import pandas as pd
 import datetime
 from PIL import Image
+import hashlib
 
-#im=Image.open("./ito.png")
-#st.set_page_config(page_icon=im)
+#データベースへの接続
+conn = psycopg2.connect(
+    user=st.secrets.DBConnection.user,
+    password=st.secrets.DBConnection.password,
+    host=st.secrets.DBConnection.host,
+    port=st.secrets.DBConnection.port,
+    dbname=st.secrets.DBConnection.dbname
+)
+cur = conn.cursor()
+st.set_page_config(initial_sidebar_state="expanded")
 
 #更新時間で色付ける？
 #登録したらformをクリア
@@ -20,51 +29,105 @@ def check_situation(val):
     c='black' if val=='その他' else ''
     return 'background-color: '+b+'; color:'+c
 
-conn = psycopg2.connect(
-    user=st.secrets.DBConnection.user,
-    password=st.secrets.DBConnection.password,
-    host=st.secrets.DBConnection.host,
-    port=st.secrets.DBConnection.port,
-    dbname=st.secrets.DBConnection.dbname
-)
-if "member" not in st.session_state:
-    st.session_state.member = pd.read_sql("select * from tsuchi.member order by 氏名", con=conn)
-    st.session_state.companion=[]
+# ユーザ認証
+def make_hashes(password):
+    return hashlib.sha256(str.encode(password)).hexdigest()
 
-st.title("北海道点呼")
 
-with st.form("form"):
-    name = st.selectbox(label='名前', options=['']+list(st.session_state.member['氏名']))
-    for i in range(len(st.session_state.companion)):
-        st.session_state.companion[i]=st.selectbox(label='名前'+str(i+2), options=['']+list(st.session_state.member['氏名']))
-    add_button,del_button=st.columns(2)
-    with add_button:
-        add_button=st.form_submit_button("同行者追加",on_click=click_add_button)
-    with del_button:
-        del_button=st.form_submit_button("同行者削除",on_click=click_del_button)
-    situation = st.selectbox(label='現在の状態', options=['','外出','帰宿','その他'])
-    memo = st.text_area('memo(行く場所、予定時間など)')
-    submitted = st.form_submit_button("送信")
+def check_hashes(password, hashed_text):
+    if make_hashes(password) == hashed_text:
+        return hashed_text
+    return False
+    
+def login_user(username, password):
+    cur.execute('SELECT * FROM hokkaido.usertable WHERE username = %s AND password = %s',(username, password))
+    data = cur.fetchall()
+    conn.commit()
+    return data
 
-if submitted:
-    if all(i!='' for i in st.session_state.companion) and name!='' and situation!='':
-        cur=conn.cursor()
-        cur.execute("insert into tsuchi.status values('%s','%s','%s')" % (name,situation,memo))
+def login_input():
+    st.sidebar.text("ログインしたらしおりが見えるよ")
+    username = st.sidebar.text_input("ユーザー名を入力してください", key="loguser", placeholder="例) user", disabled=st.session_state.initial_load)
+    password = st.sidebar.text_input("パスワードを入力してください", key="logpass", type='password', disabled=st.session_state.initial_load, placeholder="例) password")
+    onbutton = st.sidebar.button("ログイン", disabled=False, key="button")
+    if onbutton or st.session_state['a']:
+        if(len(username) != 0 and len(password) != 0):
+            hashed_pswd = make_hashes(password)
+            result = login_user(username, check_hashes(password, hashed_pswd))
+            if result:
+                st.session_state['a']= True
+                st.sidebar.success("{}さんでログインしました".format(username))
+                st.session_state.initial_load=True
+                st.session_state['error']=False
+                # ログイン成功後の画面を表示
+            else:
+                st.sidebar.error("ユーザー名かパスワードが間違っています")
+        else:
+            st.sidebar.warning("ユーザ名とパスワードを1文字以上で入力して下さい")
+
+
+def main():
+    if 'initial_load' not in st.session_state:
+        st.session_state.initial_load = False
+    login_input()
+
+    if "member" not in st.session_state:
+        st.session_state.member = pd.read_sql("select left(氏名,6) as 氏名 from hokkaido.member order by 氏名;", con=conn)
+        st.session_state.companion=[]
+
+    st.title("北海道点呼")
+
+    with st.form("form"):
+        if(st.session_state['a']):
+            st.session_state.member = pd.read_sql("select * from hokkaido.member order by 氏名", con=conn)
+        name = st.selectbox(label='名前', options=['']+list(st.session_state.member['氏名']))
         for i in range(len(st.session_state.companion)):
-            cur.execute("insert into tsuchi.status values('%s','%s','%s')" % (st.session_state.companion[i],situation,memo))
-        conn.commit()
-        cur.close()
-        st.success('登録しました')
+            st.session_state.companion[i]=st.selectbox(label='名前'+str(i+2), options=['']+list(st.session_state.member['氏名']))
+        add_button,del_button=st.columns(2)
+        with add_button:
+            add_button=st.form_submit_button("同行者追加",on_click=click_add_button)
+        with del_button:
+            del_button=st.form_submit_button("同行者削除",on_click=click_del_button)
+        situation = st.selectbox(label='現在の状態', options=['','外出','帰宿','その他'])
+        memo = st.text_area('memo(行く場所、予定時間など)')
+        submitted = st.form_submit_button("送信")
+
+    if submitted:
+        if all(i!='' for i in st.session_state.companion) and name!='' and situation!='':
+            cur=conn.cursor()
+            simei='"氏名"'
+            if(st.session_state['a']):
+                cur.execute("insert into hokkaido.status values('%s','%s','%s')" % (name,situation,memo))
+            else:
+                name1="'"+name+"%'"
+                cur.execute("insert into hokkaido.status values((select * from hokkaido.member where %s like %s),'%s','%s')" % (simei,name1,situation,memo))
+            for i in range(len(st.session_state.companion)):
+                cur.execute("insert into hokkaido.status values('%s','%s','%s')" % (st.session_state.companion[i],situation,memo))
+            conn.commit()
+            cur.close()
+            st.success('登録しました')
+        else:
+            st.error('入力されていない項目があります(memoを除く)')
+    if(st.button('更新')):
+        st.snow()
+    if(st.session_state['a']):
+        status=pd.read_sql("select distinct on(氏名) 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') as 更新時刻 from(select * from hokkaido.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from hokkaido.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a;", con=conn)
     else:
-        st.error('入力されていない項目があります(memoを除く)')
-st.button('更新')
-status=pd.read_sql("select distinct on(氏名) 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') from(select * from tsuchi.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from tsuchi.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a", con=conn)
-status=status.style.applymap(check_situation,subset=['状態'])
-st.table(status)
+        status=pd.read_sql("select distinct on(氏名) left(氏名,6) as 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') as 更新時刻 from(select * from hokkaido.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from hokkaido.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a;", con=conn)
+    status=status.style.applymap(check_situation,subset=['状態'])
+    st.table(status)
 
-url='https://sistkanri-my.sharepoint.com/:w:/g/personal/umehara_takahito_sist_ac_jp/EX62-2AEGlRLmkYiOlk4LCMBhwKkLNwvp-PFCKJnJ0c4xQ?e=OXLSdN'
-st.write('[しおり](%s)' % url)
+    url=st.secrets.url.bookmark
+    if(st.session_state['a']):
+        st.write('[しおり](%s)' % url)
 
+if __name__ == '__main__':
+    if 'a' not in st.session_state:
+        st.session_state['a'] = False
+    main()
+
+#データベース接続をクローズ
+cur.close()    
 conn.close()
 
 #https://qiita.com/nockn/items/15e081b58e02a0878855
