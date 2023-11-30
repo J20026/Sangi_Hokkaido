@@ -46,7 +46,7 @@ def login_user(username, password):
     return data
 
 def login_input():
-    st.sidebar.text("ログインしたらしおりが見えるよ")
+    st.sidebar.text("ログインしたらしおりと名前が見えるよ")
     username = st.sidebar.text_input("ユーザー名を入力してください", key="loguser", placeholder="例) user", disabled=st.session_state.initial_load)
     password = st.sidebar.text_input("パスワードを入力してください", key="logpass", type='password', disabled=st.session_state.initial_load, placeholder="例) password")
     onbutton = st.sidebar.button("ログイン", disabled=False, key="button")
