@@ -74,8 +74,10 @@ def main():
     if "member" not in st.session_state:
         st.session_state.member = pd.read_sql("select left(氏名,6) as 氏名 from hokkaido.member order by 氏名;", con=conn)
         st.session_state.companion=[]
-
-    st.title("北海道点呼")
+    if(st.session_state['a']):
+        st.title("北海道点呼(ログイン中)")
+    else:
+        st.title("北海道点呼(未ログイン)")
 
     with st.form("form"):
         if(st.session_state['a']):
