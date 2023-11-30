@@ -97,14 +97,17 @@ def main():
     if submitted:
         if all(i!='' for i in st.session_state.companion) and name!='' and situation!='':
             cur=conn.cursor()
-            simei='"氏名"'
             if(st.session_state['a']):
                 cur.execute("insert into hokkaido.status values('%s','%s','%s')" % (name,situation,memo))
             else:
                 name1="'"+name+"%'"
-                cur.execute("insert into hokkaido.status values((select * from hokkaido.member where %s like %s),'%s','%s')" % (simei,name1,situation,memo))
-            for i in range(len(st.session_state.companion)):
-                cur.execute("insert into hokkaido.status values('%s','%s','%s')" % (st.session_state.companion[i],situation,memo))
+                cur.execute("insert into hokkaido.status values((select * from hokkaido.member where \"氏名\" like %s),'%s','%s')" % (name1,situation,memo))
+            for i in range(len(st.session_state.companion)):    
+                if(st.session_state['a']):
+                    cur.execute("insert into hokkaido.status values('%s','%s','%s')" % (st.session_state.companion[i],situation,memo))
+                else:
+                    name1="'"+st.session_state.companion[i]+"%'"
+                    cur.execute("insert into hokkaido.status values((select * from hokkaido.member where \"氏名\" like %s),'%s','%s')" % (name1,situation,memo))
             conn.commit()
             cur.close()
             st.success('登録しました')
