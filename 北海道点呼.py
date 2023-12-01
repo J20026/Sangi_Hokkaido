@@ -116,9 +116,9 @@ def main():
     if(st.button('更新')):
         st.snow()
     if(st.session_state['a']):
-        status=pd.read_sql("select distinct on(氏名) 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') as 更新時刻 from(select * from hokkaido.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from hokkaido.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a;", con=conn)
+        status=pd.read_sql("select 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') as 更新時刻 from hokkaido.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from hokkaido.status group by 氏名) group by 氏名,状態,memo,更新時刻 order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名;", con=conn)
     else:
-        status=pd.read_sql("select distinct on(氏名) left(氏名,6) as 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') as 更新時刻 from(select * from hokkaido.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from hokkaido.status group by 氏名) order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名) a;", con=conn)
+        status=pd.read_sql("select left(氏名,6) as 氏名,状態,memo,TO_CHAR(更新時刻 + INTERVAL '9 HOURS', 'YYYY/MM/DD HH24:MI:SS') as 更新時刻 from hokkaido.status where (氏名,更新時刻) in (select 氏名,max(更新時刻) from hokkaido.status group by 氏名) group by 氏名,状態,memo,更新時刻 order by case 状態 when '外出' then 1 when 'その他' then 2 when '帰宿' then 3 end,氏名;", con=conn)
     status=status.style.applymap(check_situation,subset=['状態'])
     st.table(status)
 
